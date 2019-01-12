@@ -1,0 +1,103 @@
+#!/usr/bin/python
+# Copyright 2018, 2019 comNET GmbH
+#
+# This file is part of aggregate_perfdata.
+#
+# aggregate_perfdata is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2, as published by
+# the Free Software Foundation.
+#
+# aggregate_perfdata is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with aggregate_perfdata.  If not, see <https://www.gnu.org/licenses/>.
+
+# coding=utf-8
+
+import sys
+import argparse
+import livestatus
+import re
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-H', '--host', help='Host name (Regex) to pull data from')
+parser.add_argument('-g', '--hostgroup', help='Host group to pull data from')
+parser.add_argument('-S', '--service', help='Service name (Regex) to pull data from')
+parser.add_argument('-s', '--servicegroup', help='Service group to pull data from')
+parser.add_argument('-m', '--metric', help='Metric information, comma separated. Metric name, unit, Display name, scaling (e.g. used,bytes,Used bytes,1)', default=None, nargs='+')
+parser.add_argument('-d', '--disable', help='Disable specific performance data variables by index number, comma separated.', default="", nargs='+')
+parser.add_argument('-r', '--rename', help='Forcibly rename a performance data variable by index number. (e.g. 5,used_bytes replaces the 5th values name with used_bytes)', default=None, nargs='+')
+parser.add_argument('-A', '--algorithm', help='Aggregation algorithm (sum or average)', default="sum")
+parser.add_argument('-D', '--description', help='Service Description', default='Aggregated Performance Data')
+args = parser.parse_args()
+
+# ToDo: support multiple sites
+sites = {
+  "sitea" : {
+        "alias"      : "Mastersite",
+        "socket"     : "tcp:127.0.0.1:6557",
+        "nagios_url" : "/nagios/",
+        "timeout"    : 2,
+  }
+}
+
+c = livestatus.MultiSiteConnection(sites)
+c.set_prepend_site(True)
+hosts_of_contact = []
+lql_query = "GET services\n"
+if args.service:
+    lql_query += "Filter: description ~ %s\n" % args.service
+if args.servicegroup:
+    lql_query += "Filter: groups >= %s\n" % args.servicegroup
+if args.host:
+    lql_query += "Filter: host_name ~ %s\n" % args.host
+if args.hostgroup:
+    lql_query += "Filter: host_groups >= %s\n" % args.hostgroup
+
+lql_query += "Filter: description != %s\nColumns: host_name description perf_data" % args.description
+
+livestatusresult = c.query(lql_query)
+merged_perfdata_result = {}
+merged_perfdata_counter= {}
+
+# Debug: print livestatusresult
+
+for hostdata in livestatusresult:
+    all_perfdata = hostdata[-1].split()
+    for index, perfdata in enumerate(all_perfdata):
+        if str(index) not in args.disable: # Do not provide disabled perfdata
+            perfdata_name = perfdata.split("=")[0]
+            # Rename performance data variable names based on their index
+            if args.rename:
+                for renaming in args.rename:
+                    rename_index, rename_name = renaming.split(",")
+                    if int(rename_index) == index:
+                        perfdata_name = rename_name
+            perfdata_value_raw = perfdata.split("=")[1].split(";")[0]
+            perfdata_value = float(re.sub('[^0-9.]','', perfdata_value_raw))
+            if not perfdata_name in merged_perfdata_result:
+                merged_perfdata_result[perfdata_name] = perfdata_value
+                merged_perfdata_counter[perfdata_name] = 1
+            else:
+                merged_perfdata_result[perfdata_name] += perfdata_value
+                merged_perfdata_counter[perfdata_name] += 1
+
+metric_dict = {}
+if args.metric:
+    for metric in args.metric:
+        metric_info = metric.split(",")
+        metric_dict[metric_info[0]] = {"unit": metric_info[1], "title": metric_info[2], "scale": metric_info[3]}
+
+print "<<<aggregated_perfdata:sep(58)>>>"
+for key, value in merged_perfdata_result.iteritems():
+    if args.algorithm == "average":
+        value = value / merged_perfdata_counter[key]
+    metric_info = metric_dict.get(key, {})
+    unit =  metric_info.get("unit", "count")
+    title =  metric_info.get("title", key)
+    scale =  metric_info.get("scale", 1)
+    value = float(value) * float(scale)
+    print "%s:%s:%f:%s:%s" % (args.description, key, value, unit, title)

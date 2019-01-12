@@ -1,0 +1,12 @@
+{'author': u'comNET GmbH, Fabian Binder',
+ 'description': u"2018-11-19 (v1.1):\n- Added functionality for mapping different metrics to units and use custom descriptions\n- Added averaging functionality\n2018-11-19 (v1.1.2):\n- Support more units\n2018-11-20 (v1.1.3):\n- Support host group and service group filtering\n2019-01-10 (v1.2.0):\n- Added functionality for replacing a perfdata variable Name based on it's index\n- Added functionality for perfdata scaling\n",
+ 'download_url': '',
+ 'files': {'agents': ['special/agent_aggregate_perfdata'],
+           'checks': ['agent_aggregate_perfdata', 'aggregated_perfdata'],
+           'web': ['plugins/wato/aggregate_perfdata.py']},
+ 'name': 'aggregate_perfdata',
+ 'num_files': 4,
+ 'title': u'Aggregate Performance data to a single Check',
+ 'version': '1.2.0',
+ 'version.min_required': '1.4.0',
+ 'version.packaged': '1.5.0p9'}

@@ -1,0 +1,68 @@
+#!/usr/bin/python
+# Copyright 2018, 2019 comNET GmbH
+#
+# This file is part of aggregate_perfdata.
+#
+# aggregate_perfdata is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2, as published by
+# the Free Software Foundation.
+#
+# aggregate_perfdata is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with aggregate_perfdata.  If not, see <https://www.gnu.org/licenses/>.
+
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+def agent_aggregate_perfdata_arguments(params, hostname, ipaddress):
+    args = ''
+
+    args += ' -D %s' % quote_shell_string(params["description"])
+
+    if "hosts" in params:
+        if params["hosts"] == "$HOSTNAME$":
+            args += ' -H %s' % hostname
+        else:
+            args += ' -H %s' % quote_shell_string(params["hosts"])
+    else:
+        args += ' -H ".*"'
+
+    if "services" in params:
+        args += ' -S %s' % quote_shell_string(params["services"])
+    else:
+        args += ' -S ".*"'
+
+    if "service_group" in params:
+        args += ' -s %s' % params["service_group"]
+
+    if "host_group" in params:
+        args += ' -g %s' % params["host_group"]
+
+
+    if params["algorithm"] == "average":
+        args += ' -A average'
+
+    if "map_metrics" in params:
+        metric_args = ""
+        for metric in params["map_metrics"]:
+            metric_args += '%s ' % quote_shell_string(','.join(str(m) for m in metric))
+        args += ' -m %s' % metric_args
+
+    if "replace_by_index" in params:
+        replace_args = ""
+        for replacing in params["replace_by_index"]:
+            replace_args += '%s ' % quote_shell_string(','.join(str(m) for m in replacing))
+        args += ' -r %s' % replace_args
+
+    if "disable_by_index" in params:
+        disable_args = ""
+        for disable in params["disable_by_index"]:
+            disable_args += '%s ' % quote_shell_string(','.join(str(m) for m in disable))
+        args += ' -d %s' % disable_args
+
+    return args
+
+special_agent_info['aggregate_perfdata'] = agent_aggregate_perfdata_arguments

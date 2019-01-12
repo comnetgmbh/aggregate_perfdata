@@ -1,0 +1,69 @@
+#!/usr/bin/python
+# Copyright 2018, 2019 comNET GmbH
+#
+# This file is part of aggregate_perfdata.
+#
+# aggregate_perfdata is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License version 2, as published by
+# the Free Software Foundation.
+#
+# aggregate_perfdata is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with aggregate_perfdata.  If not, see <https://www.gnu.org/licenses/>.
+
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+# <<<aggregated_perfdata:sep(58)>>>
+# used:871578599424.000000:bytes
+# max_size:972331941888.000000:bytes
+# size:900598857728.000000:bytes
+
+import cmk.paths
+
+def inventory_aggregated_perfdata(info):
+    if info:
+        yield info[0][0], None
+
+
+def check_aggregated_perfdata(item, params, info):
+    if not info:
+        yield 3, "Item not found in agent output"
+
+    aggregated_perfdata_metric_info = ""
+    for description, name, value, unit, title in info:
+        # ToDo: warn, crit?
+        perfdata = [(name, value)]
+
+        # Simple unit conversation for better display of large values
+        if unit == "bytes":
+            value = get_bytes_human_readable(float(value))
+        elif unit == "bytes/s":
+            value = "%s/s" % get_bytes_human_readable(float(value))
+        elif unit == "bytes/d":
+            value = "%s/d" % get_bytes_human_readable(float(value))
+        elif unit == "1/s":
+            value = "%s/s" % float(value)
+        elif unit == "s":
+            value = "%s" % get_age_human_readable(float(value))
+        elif unit == "count":
+            value = int(float(value))
+        else:
+            value = "%s %s" % (float(value), unit)
+
+        aggregated_perfdata_metric_info += "metric_info['%s'] = {'title': '%s', 'unit' : '%s', 'color': '31/a'}\n" % (name, title, unit)
+        yield 0, "%s: %s" % (title, value), perfdata
+    f = open(cmk.paths.local_share_dir + '/web/plugins/metrics/aggregated_perfdata.%s.py' % host_name(), 'w')
+    f.write(aggregated_perfdata_metric_info)
+
+
+check_info['aggregated_perfdata'] = {
+    "check_function"          : check_aggregated_perfdata,
+    "inventory_function"      : inventory_aggregated_perfdata,
+    "service_description"     : "%s",
+    "has_perfdata"            : True,
+    "group"                   : "aggregated_perfdata",
+}
